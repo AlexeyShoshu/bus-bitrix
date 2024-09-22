@@ -1,0 +1,90 @@
+#
+# .gitignore для сайтов на bitrix
+#
+
+
+# Сам .gitignore нужен
+!/.gitignore
+
+# Исключаем bitrix/, там по большей части то, что хранить в репозитории нет необходимости (ядро Битрикс).
+/bitrix/*
+# Явно исключаем кеш и временные папки
+/bitrix/managed_cache
+/bitrix/stack_cache
+/bitrix/cache
+/bitrix/html_pages
+/bitrix/tmp
+# Храним php_interface
+!/bitrix/php_interface
+!/bitrix/php_interface/*
+!/bitrix/php_interface/**
+# Исключаем настройки БД
+/bitrix/php_interface/dbconn.php
+
+# Храним шаблоны сайтов
+!/bitrix/templates/
+!/bitrix/templates/*
+!/bitrix/templates/**
+
+# .htaccess на каждом сервере свой
+/.htaccess
+
+# Часто используемая папка для временных файлов
+/tmp
+
+# Слишком большой объем для хранения в репозитории
+/upload
+
+# Архивы в корне сайта
+/*.zip
+/*.rar
+/*.tar.gz
+
+# Импорт инфоблоков
+/*_files
+/*_files.zip
+/*_files.tar.gz
+
+# Временные скрипты
+/dev-*
+
+# Файлы, которые часто создают хостинги
+/.well-known
+
+#
+# Маски файлов
+#
+
+# Логи
+*.log
+# Архивы
+*.gz
+*.bz
+*.bz2
+*.tar
+*.zip
+*.rar
+*.7z
+# Операционки
+.DS_Store
+Thumbs.db
+# vim
+*.swp
+*.swo
+*.swq
+# Бэкапы
+*.bak
+*.BAK
+
+#
+# ИСКЛЮЧЕНИЯ ПРОЕКТА
+#
+
+# Частые ситуации (раскомментировать при необходимости)
+
+## composer
+# /composer.json
+# /composer.lock
+
+## vendor/. 
+# /vendor
