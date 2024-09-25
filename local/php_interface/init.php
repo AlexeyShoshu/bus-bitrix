@@ -43,19 +43,28 @@ class OrderHandler
             $itemsGroupedByProperties = [];
             $basketItems = $basket->getBasketItems();
 
+            $itemIds = [];
+            foreach ($basketItems as $basketItem) {
+                $itemIds[] = $basketItem->getProductId();
+            }
+
+            $elementInfo = CIBlockElement::GetList(
+                [],
+                ["ID" => $itemIds],
+                false,
+                false,
+                ["ID", "PROPERTY_COLOR_LIST", "PROPERTY_MANUFACTURER_LIST"]
+            );
+
+            $elementData = [];
+            while ($element = $elementInfo->Fetch()) {
+                $elementData[$element['ID']] = $element;
+            }
+
             foreach ($basketItems as $basketItem) {
                 $itemId = $basketItem->getProductId();
-                logToFile("Обработка товара с ID = " . $itemId);
-
-                $elementInfo = CIBlockElement::GetList(
-                    [],
-                    ["ID" => $itemId],
-                    false,
-                    false,
-                    ["IBLOCK_ID", "PROPERTY_COLOR_LIST", "PROPERTY_MANUFACTURER_LIST"]
-                );
-
-                if ($element = $elementInfo->Fetch()) {
+                if (isset($elementData[$itemId])) {
+                    $element = $elementData[$itemId];
                     $color = $element["PROPERTY_COLOR_LIST_VALUE"];
                     $manufacturer = $element["PROPERTY_MANUFACTURER_LIST_VALUE"];
                     logToFile("Товар с ID = " . $itemId . " имеет свойства: COLOR = " . $color . ", MANUFACTURER = " . $manufacturer);
@@ -80,6 +89,33 @@ class OrderHandler
                         $newOrder->setPersonTypeId($order->getPersonTypeId());
                         $newOrder->setField("CURRENCY", $currency);
 
+                        $shipmentCollection = $order->getShipmentCollection();
+                        $paymentCollection = $order->getPaymentCollection();
+
+                        $newShipmentCollection = $newOrder->getShipmentCollection();
+                        $newPaymentCollection = $newOrder->getPaymentCollection();
+
+                        foreach ($shipmentCollection as $shipment) {
+                            $newShipment = $newShipmentCollection->createItem($shipment->getDelivery());
+                            $newShipment->setFields([
+                                'DELIVERY_ID' => $shipment->getDeliveryId(),
+                                'DELIVERY_NAME' => $shipment->getDeliveryName(),
+                                'STATUS_ID' => $shipment->getField('STATUS_ID'),
+                                'DEDUCTED' => $shipment->getField('DEDUCTED'),
+                                'ALLOW_DELIVERY' => $shipment->getField('ALLOW_DELIVERY'),
+                                'PRICE_DELIVERY' => $shipment->getField('PRICE_DELIVERY')
+                            ]);
+                        }
+
+                        foreach ($paymentCollection as $payment) {
+                            $newPayment = $newPaymentCollection->createItem($payment->getPaySystem());
+                            $newPayment->setFields([
+                                'PAY_SYSTEM_ID' => $payment->getPaymentSystemId(),
+                                'PAY_SYSTEM_NAME' => $payment->getPaymentSystemName(),
+                                'SUM' => $newOrder->getPrice()
+                            ]);
+                        }
+
                         $propertyCollection = $order->getPropertyCollection();
                         $newPropertyCollection = $newOrder->getPropertyCollection();
 
@@ -92,6 +128,8 @@ class OrderHandler
 
                         $newBasket = \Bitrix\Sale\Basket::create($siteId);
                         $newBasket->setFUserId($userId);
+
+                        $shipmentItemCollection = $newShipment->getShipmentItemCollection();
 
                         foreach ($items as $item) {
                             logToFile("Добавляем товар в новый заказ: ID = " . $item->getProductId());
@@ -120,21 +158,28 @@ class OrderHandler
                                     }
                                 }
 
-                                logToFile(print_r($properties, true));
-                            
+                                //logToFile(print_r($properties, true));
+
                                 // foreach ($properties as $property) {
                                 //     foreach ($property as $code => $value) {
                                 //         $newItem->setFieldNoDemand($code, $value);
                                 //     }
                                 // }
                             }
+
+                            try {
+                                logToFile("Создание элемента отгрузки для товара ID: " . $newItem->getId() . " с количеством: " . $newItem->getQuantity());
                             
+                                $shipmentItem = $shipmentItemCollection->createItem($newItem);
+                                $shipmentItem->setQuantity($newItem->getQuantity());
+
+                                logToFile("Элемент отгрузки создан: ID = " . $shipmentItem->getId() . ", количество установлено: " . $shipmentItem->getQuantity());
+                            } catch (Exception $e) {
+                                logToFile("Ошибка при создании элемента отгрузки: " . $e->getMessage());
+                            }
 
                             logToFile("Товар с ID = " . $item->getProductId() . " добавлен в новый заказ.");
                         }
-
-
-
 
                         $newBasket->save();
                         $newOrder->setBasket($newBasket);
@@ -158,11 +203,14 @@ class OrderHandler
                     }
                 }
             }
+
+            $order->save();
         } catch (\Exception $e) {
             logToFile("Общая ошибка: " . $e->getMessage());
         }
 
         logToFile("Обработка заказа завершена для заказа ID: " . $order->getId());
+        $order->delete($order->getId());
         self::$isProcessing = false;
     }
 }
